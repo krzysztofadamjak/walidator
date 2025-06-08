@@ -54,12 +54,13 @@
 
 <div id="results" class="result"></div>
 
-<!-- Załaduj parser SQL (node-sql-parser) z CDN -->
+<!-- Parser SQL przez CDN -->
 <script src="https://cdn.jsdelivr.net/npm/node-sql-parser@1.10.2/dist/parser.min.js"></script>
 
 <script>
   const parser = new window.NodeSqlParser.Parser();
 
+  // Walidacja JSON
   function validateJSON(jsonStr) {
     try {
       JSON.parse(jsonStr);
@@ -69,39 +70,69 @@
     }
   }
 
+  // Prosty heurystyczny walidator HTML (sprawdzanie par tagów)
+  function simpleHTMLValidator(htmlStr) {
+    // Usuwamy komentarze i skrypty/styl
+    const cleanStr = htmlStr.replace(/<!--[\s\S]*?-->/g, '')
+                            .replace(/<script[\s\S]*?<\/script>/gi, '')
+                            .replace(/<style[\s\S]*?<\/style>/gi, '');
+
+    const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
+    let tags = [];
+    let match;
+
+    while ((match = tagRegex.exec(cleanStr)) !== null) {
+      const fullTag = match[0];
+      const tagName = match[1].toLowerCase();
+      const isClosing = fullTag.startsWith('</');
+      tags.push({ tagName, isClosing });
+    }
+
+    const selfClosingTags = ['br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'param', 'source', 'track', 'wbr'];
+
+    let stack = [];
+
+    for (const tag of tags) {
+      if (selfClosingTags.includes(tag.tagName)) {
+        continue;
+      }
+      if (!tag.isClosing) {
+        stack.push(tag.tagName);
+      } else {
+        if (stack.length === 0) {
+          return { valid: false, message: `Zamykający tag </${tag.tagName}> bez odpowiadającego otwarcia.` };
+        }
+        const last = stack.pop();
+        if (last !== tag.tagName) {
+          return { valid: false, message: `Niepoprawna para tagów: otwarcie <${last}> zamknięcie </${tag.tagName}>.` };
+        }
+      }
+    }
+
+    if (stack.length > 0) {
+      return { valid: false, message: `Brakujące zamknięcie tagu <${stack[stack.length - 1]}>.` };
+    }
+
+    return { valid: true, message: 'HTML przeszedł podstawową walidację składniową.' };
+  }
+
   function validateHTML(htmlStr) {
+    if (!htmlStr.trim()) {
+      return { valid: false, message: 'Kod HTML jest pusty.' };
+    }
     try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlStr, 'text/html');
-
-      if (!doc || !doc.body) {
-        return { valid: false, message: 'Błąd podczas parsowania HTML.' };
-      }
-
-      const parserError = doc.querySelector('parsererror');
-      if (parserError) {
-        return { valid: false, message: 'Błąd HTML: ' + parserError.textContent };
-      }
-
-      if (doc.body.innerHTML.trim() === '') {
-        return { valid: false, message: 'HTML jest pusty lub nie zawiera żadnych elementów.' };
-      }
-
-      // Dodatkowa prosta walidacja tagów — np. czy są poprawnie zamknięte
-      // Ale DOMParser robi to automatycznie, więc dla prostoty uznajemy to za poprawne
-
-      return { valid: true, message: 'HTML jest poprawny.' };
+      return simpleHTMLValidator(htmlStr);
     } catch (e) {
-      return { valid: false, message: 'Błąd HTML: ' + e.message };
+      return { valid: false, message: 'Błąd walidacji HTML: ' + e.message };
     }
   }
 
+  // Walidacja SQL przy pomocy node-sql-parser
   function validateSQL(sqlStr) {
     if (!sqlStr || sqlStr.trim() === '') {
       return { valid: false, message: 'Kod SQL jest pusty.' };
     }
     try {
-      // Parser spróbuje sparsować zapytanie SQL
       parser.astify(sqlStr);
       return { valid: true, message: 'Kod SQL jest poprawny.' };
     } catch (e) {
