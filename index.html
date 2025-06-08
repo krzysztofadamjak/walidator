@@ -1,45 +1,45 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<meta charset="UTF-8" />
-<title>Walidator JSON / SQL</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
-    max-width: 700px;
-  }
-  textarea {
-    width: 100%;
-    height: 150px;
-    font-family: monospace;
-    font-size: 14px;
-    margin-bottom: 10px;
-    resize: vertical;
-  }
-  button {
-    padding: 10px 20px;
-    font-size: 16px;
-    cursor: pointer;
-    margin-bottom: 20px;
-  }
-  .result {
-    border: 1px solid #ccc;
-    padding: 10px;
-    white-space: pre-wrap;
-    background: #f9f9f9;
-  }
-  .valid {
-    color: green;
-  }
-  .invalid {
-    color: red;
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Walidator JSON i SQL</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px auto;
+      max-width: 800px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-family: monospace;
+      font-size: 14px;
+      margin-bottom: 10px;
+      resize: vertical;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .result {
+      border: 1px solid #ccc;
+      padding: 10px;
+      white-space: pre-wrap;
+      background: #f9f9f9;
+    }
+    .valid {
+      color: green;
+    }
+    .invalid {
+      color: red;
+    }
+  </style>
 </head>
 <body>
 
-<h1>Walidator JSON / SQL</h1>
+<h1>Rozbudowany walidator JSON i SQL</h1>
 
 <h3>JSON</h3>
 <textarea id="jsonInput" placeholder="Wklej kod JSON tutaj..."></textarea>
@@ -51,56 +51,67 @@
 
 <div id="results" class="result"></div>
 
-<!-- Parser SQL przez CDN -->
-<script src="https://cdn.jsdelivr.net/npm/node-sql-parser@1.10.2/dist/parser.min.js"></script>
-
 <script>
-  const parser = new window.NodeSqlParser.Parser();
-
   function validateJSON(jsonStr) {
     try {
-      JSON.parse(jsonStr);
-      return { valid: true, message: 'JSON jest poprawny.' };
+      const parsed = JSON.parse(jsonStr);
+      return {
+        valid: true,
+        message: 'JSON jest poprawny.\nSformatowany JSON:\n' + JSON.stringify(parsed, null, 2)
+      };
     } catch (e) {
-      return { valid: false, message: 'Błąd JSON: ' + e.message };
+      return {
+        valid: false,
+        message: 'Błąd JSON: ' + e.message
+      };
     }
   }
 
   function validateSQL(sqlStr) {
+    const basicSqlPattern = /^(SELECT|INSERT|UPDATE|DELETE)\s+[\s\S]+/i;
+    const forbiddenWords = /\b(DELETE\s+FROM\s+.*;\s*DROP\s+TABLE|TRUNCATE)\b/i;
+
     if (!sqlStr || sqlStr.trim() === '') {
       return { valid: false, message: 'Kod SQL jest pusty.' };
     }
-    try {
-      // Usuń średnik na końcu, jeśli jest
-      const trimmedSql = sqlStr.trim().replace(/;$/, '');
-      parser.astify(trimmedSql);
-      return { valid: true, message: 'Kod SQL jest poprawny.' };
-    } catch (e) {
-      return { valid: false, message: 'Błąd SQL: ' + e.message };
+
+    if (forbiddenWords.test(sqlStr)) {
+      return { valid: false, message: 'Błąd SQL: Niedozwolone operacje (DROP/TRUNCATE).' };
     }
+
+    if (!basicSqlPattern.test(sqlStr.trim())) {
+      return { valid: false, message: 'Błąd SQL: Zapytanie nie zaczyna się od SELECT/INSERT/UPDATE/DELETE lub jest niepełne.' };
+    }
+
+    const parentheses = (sqlStr.match(/[()]/g) || []).join('');
+    if ((parentheses.match(/\(/g) || []).length !== (parentheses.match(/\)/g) || []).length) {
+      return { valid: false, message: 'Błąd SQL: Niezbalansowane nawiasy.' };
+    }
+
+    return { valid: true, message: 'Kod SQL wygląda poprawnie (walidacja heurystyczna).' };
   }
 
   function validateAll() {
     const jsonInput = document.getElementById('jsonInput').value.trim();
     const sqlInput = document.getElementById('sqlInput').value.trim();
+    const resultsDiv = document.getElementById('results');
 
     let results = '';
 
     if (jsonInput.length > 0) {
       const res = validateJSON(jsonInput);
-      results += `JSON: ${res.valid ? '✔' : '✘'} ${res.message}\n`;
+      results += `JSON: ${res.valid ? '✔' : '✘'}\n${res.message}\n\n`;
     } else {
-      results += 'JSON: brak danych do walidacji.\n';
+      results += 'JSON: brak danych do walidacji.\n\n';
     }
 
     if (sqlInput.length > 0) {
       const res = validateSQL(sqlInput);
-      results += `SQL: ${res.valid ? '✔' : '✘'} ${res.message}\n`;
+      results += `SQL: ${res.valid ? '✔' : '✘'}\n${res.message}\n`;
     } else {
       results += 'SQL: brak danych do walidacji.\n';
     }
 
-    const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = results
       .split('\n')
       .map(line => {
