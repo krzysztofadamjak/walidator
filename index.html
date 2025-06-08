@@ -2,12 +2,12 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8" />
-<title>Rozbudowany Walidator JSON / HTML / SQL</title>
+<title>Walidator JSON / SQL</title>
 <style>
   body {
     font-family: Arial, sans-serif;
     margin: 20px;
-    max-width: 800px;
+    max-width: 700px;
   }
   textarea {
     width: 100%;
@@ -39,13 +39,10 @@
 </head>
 <body>
 
-<h1>Rozbudowany Walidator JSON / HTML / SQL</h1>
+<h1>Walidator JSON / SQL</h1>
 
 <h3>JSON</h3>
 <textarea id="jsonInput" placeholder="Wklej kod JSON tutaj..."></textarea>
-
-<h3>HTML</h3>
-<textarea id="htmlInput" placeholder="Wklej kod HTML tutaj..."></textarea>
 
 <h3>SQL</h3>
 <textarea id="sqlInput" placeholder="Wklej kod SQL tutaj..."></textarea>
@@ -60,7 +57,6 @@
 <script>
   const parser = new window.NodeSqlParser.Parser();
 
-  // Walidacja JSON
   function validateJSON(jsonStr) {
     try {
       JSON.parse(jsonStr);
@@ -70,64 +66,6 @@
     }
   }
 
-  // Prosty heurystyczny walidator HTML (sprawdzanie par tagów)
-  function simpleHTMLValidator(htmlStr) {
-    // Usuwamy komentarze i skrypty/styl
-    const cleanStr = htmlStr.replace(/<!--[\s\S]*?-->/g, '')
-                            .replace(/<script[\s\S]*?<\/script>/gi, '')
-                            .replace(/<style[\s\S]*?<\/style>/gi, '');
-
-    const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
-    let tags = [];
-    let match;
-
-    while ((match = tagRegex.exec(cleanStr)) !== null) {
-      const fullTag = match[0];
-      const tagName = match[1].toLowerCase();
-      const isClosing = fullTag.startsWith('</');
-      tags.push({ tagName, isClosing });
-    }
-
-    const selfClosingTags = ['br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'param', 'source', 'track', 'wbr'];
-
-    let stack = [];
-
-    for (const tag of tags) {
-      if (selfClosingTags.includes(tag.tagName)) {
-        continue;
-      }
-      if (!tag.isClosing) {
-        stack.push(tag.tagName);
-      } else {
-        if (stack.length === 0) {
-          return { valid: false, message: `Zamykający tag </${tag.tagName}> bez odpowiadającego otwarcia.` };
-        }
-        const last = stack.pop();
-        if (last !== tag.tagName) {
-          return { valid: false, message: `Niepoprawna para tagów: otwarcie <${last}> zamknięcie </${tag.tagName}>.` };
-        }
-      }
-    }
-
-    if (stack.length > 0) {
-      return { valid: false, message: `Brakujące zamknięcie tagu <${stack[stack.length - 1]}>.` };
-    }
-
-    return { valid: true, message: 'HTML przeszedł podstawową walidację składniową.' };
-  }
-
-  function validateHTML(htmlStr) {
-    if (!htmlStr.trim()) {
-      return { valid: false, message: 'Kod HTML jest pusty.' };
-    }
-    try {
-      return simpleHTMLValidator(htmlStr);
-    } catch (e) {
-      return { valid: false, message: 'Błąd walidacji HTML: ' + e.message };
-    }
-  }
-
-  // Walidacja SQL przy pomocy node-sql-parser
   function validateSQL(sqlStr) {
     if (!sqlStr || sqlStr.trim() === '') {
       return { valid: false, message: 'Kod SQL jest pusty.' };
@@ -142,7 +80,6 @@
 
   function validateAll() {
     const jsonInput = document.getElementById('jsonInput').value.trim();
-    const htmlInput = document.getElementById('htmlInput').value.trim();
     const sqlInput = document.getElementById('sqlInput').value.trim();
 
     let results = '';
@@ -152,13 +89,6 @@
       results += `JSON: ${res.valid ? '✔' : '✘'} ${res.message}\n`;
     } else {
       results += 'JSON: brak danych do walidacji.\n';
-    }
-
-    if (htmlInput.length > 0) {
-      const res = validateHTML(htmlInput);
-      results += `HTML: ${res.valid ? '✔' : '✘'} ${res.message}\n`;
-    } else {
-      results += 'HTML: brak danych do walidacji.\n';
     }
 
     if (sqlInput.length > 0) {
