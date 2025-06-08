@@ -71,7 +71,9 @@
       return { valid: false, message: 'Kod SQL jest pusty.' };
     }
     try {
-      parser.astify(sqlStr);
+      // Usuń średnik na końcu, jeśli jest
+      const trimmedSql = sqlStr.trim().replace(/;$/, '');
+      parser.astify(trimmedSql);
       return { valid: true, message: 'Kod SQL jest poprawny.' };
     } catch (e) {
       return { valid: false, message: 'Błąd SQL: ' + e.message };
