@@ -15,6 +15,7 @@
       font-family: monospace;
       font-size: 14px;
       margin-bottom: 10px;
+      resize: vertical;
     }
     button {
       padding: 10px 20px;
@@ -67,11 +68,20 @@
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(htmlStr, 'text/html');
-      // Sprawdzamy czy parser zwrócił błąd (sposób uproszczony)
+
+      if (!doc || !doc.body) {
+        return { valid: false, message: 'Błąd podczas parsowania HTML.' };
+      }
+
       const parserError = doc.querySelector('parsererror');
       if (parserError) {
         return { valid: false, message: 'Błąd HTML: ' + parserError.textContent };
       }
+
+      if (doc.body.innerHTML.trim() === '') {
+        return { valid: false, message: 'HTML jest pusty lub nie zawiera żadnych elementów.' };
+      }
+
       return { valid: true, message: 'HTML jest poprawny.' };
     } catch (e) {
       return { valid: false, message: 'Błąd HTML: ' + e.message };
@@ -79,14 +89,27 @@
   }
 
   function validateSQL(sqlStr) {
-    // Prosta heurystyka: sprawdzamy czy kod zawiera podstawowe słowa kluczowe SQL
+    if (!sqlStr || sqlStr.trim() === '') {
+      return { valid: false, message: 'Kod SQL jest pusty.' };
+    }
+
     const keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'FROM', 'WHERE'];
     const sqlUpper = sqlStr.toUpperCase();
-    const foundKeyword = keywords.some(kw => sqlUpper.includes(kw));
-    if (!foundKeyword) {
+
+    const containsKeyword = keywords.some(kw => sqlUpper.includes(kw));
+
+    if (!containsKeyword) {
       return { valid: false, message: 'Kod SQL nie zawiera podstawowych słów kluczowych.' };
     }
-    // Dodatkowo można tu dodać bardziej rozbudowaną walidację, ale wymaga backendu lub zewnętrznych bibliotek.
+
+    if (sqlUpper.includes('SELECT')) {
+      const selectPart = sqlUpper.split('FROM')[0];
+      const afterSelect = selectPart.replace('SELECT', '').trim();
+      if (afterSelect === '') {
+        return { valid: false, message: 'Brak kolumn po SELECT.' };
+      }
+    }
+
     return { valid: true, message: 'Kod SQL wygląda poprawnie (heurystyka).' };
   }
 
@@ -108,30 +131,4 @@
       const res = validateHTML(htmlInput);
       results += `HTML: ${res.valid ? '✔' : '✘'} ${res.message}\n`;
     } else {
-      results += 'HTML: brak danych do walidacji.\n';
-    }
-
-    if (sqlInput.length > 0) {
-      const res = validateSQL(sqlInput);
-      results += `SQL: ${res.valid ? '✔' : '✘'} ${res.message}\n`;
-    } else {
-      results += 'SQL: brak danych do walidacji.\n';
-    }
-
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.textContent = results;
-
-    // Kolorowanie wyników
-    resultsDiv.innerHTML = results
-      .split('\n')
-      .map(line => {
-        if (line.includes('✔')) return `<div class="valid">${line}</div>`;
-        if (line.includes('✘')) return `<div class="invalid">${line}</div>`;
-        return `<div>${line}</div>`;
-      })
-      .join('');
-  }
-</script>
-
-</body>
-</html>
+      results += 'HTML: brak
